@@ -25,6 +25,7 @@ Group project comparing the performance of a **Type 1** hypervisor (Proxmox VE) 
 ## Repository contents
 
 - `Comandos para Testes.txt`: how to install each tool and the exact commands we used, plus the network setup needed for the iPerf3 tests (including the difficulties we had connecting the Type 1 hypervisor).
+- `finaltests/`: the results of all the benchmarking tests, separated into `type1/` and `type2/` subfolders.
 
 ## How to reproduce
 
