@@ -1,0 +1,258 @@
+==============================================================
+ BENCHMARK GUIDE - Type 1 vs Type 2 Hypervisors
+ Tools: IOzone, RAMspeed, iPerf3, Geekbench 7
+==============================================================
+
+
+--------------------------------------------------------------
+0. VM PREPARATION
+--------------------------------------------------------------
+Update the system and install a desktop environment:
+
+    sudo apt update && sudo apt upgrade -y
+    sudo apt install ubuntu-desktop -y
+
+Reboot the VM afterwards:
+
+    sudo reboot
+
+Install the basic tools needed for the steps below:
+
+    sudo apt install git build-essential wget -y
+
+
+--------------------------------------------------------------
+1. IOZONE  (File system / disk I/O)
+--------------------------------------------------------------
+Installation:
+
+    sudo apt install iozone3
+
+(If the package is not found, enable the "multiverse" repository
+ and run "sudo apt update" again.)
+
+Command used:
+
+    iozone -t 2
+
+    -t 2  -> throughput mode with 2 threads/processes
+             (read, write, re-read, re-write, etc.)
+
+
+--------------------------------------------------------------
+2. RAMSPEED  (Memory)
+--------------------------------------------------------------
+Installation:
+
+    git clone https://github.com/cruvolo/ramspeed.git
+    cd ramspeed
+    ./build.sh
+
+Commands used:
+
+    ramspeed -b 3
+    ramspeed -b 6
+
+    -b <n>  -> selects which memory benchmark to run
+               (tests number 3 and 6)
+
+(If "ramspeed" is not in your PATH, run it from the build folder
+ with ./ramspeed instead.)
+
+
+--------------------------------------------------------------
+3. IPERF3  (Network)
+--------------------------------------------------------------
+
+
+Installation (on BOTH the server and the client machine):
+
+    sudo apt install iperf3
+
+(During installation, choose to run iperf3 as a daemon if asked,
+ so it can act as a background server.)
+
+Step 1 - On the SERVER machine, start iperf3 in server mode:
+
+    iperf3 -s
+
+Step 2 - On the CLIENT machine (the VM being tested), run:
+
+    TCP test (window size 20 KB):
+        iperf3 -c <SERVER-IP> -w 20K
+
+    UDP test:
+        iperf3 -u -c <SERVER-IP>
+
+Replace <SERVER-IP> with the IP address of the machine running
+"iperf3 -s". You can find it with:  ip a
+
+
+--------------------------------------------------------------
+4. GEEKBENCH 7  (CPU)
+--------------------------------------------------------------
+Installation:
+
+    wget https://geekbench-cdn.b-cdn.net/Geekbench-7.1.0-Linux.tar.gz
+    tar -zxvf Geekbench-7.1.0-Linux.tar.gz
+    cd Geekbench-7.1.0-Linux
+
+Command used:
+
+    ./Geekbench7
+
+
+--------------------------------------------------------------
+NOTES FOR REPRODUCIBILITY
+--------------------------------------------------------------
+- Run every benchmark with the same VM settings on both
+  hypervisors (RAM, number of CPUs, disk size).
+- Close other applications while benchmarking.
+- Repeat each test several times and use the average.
+==============================================================
+
+
+
+--------------------------------------------------------------
+*3.1 IPERF3 - NETWORK SETUP USED IN OUR TESTS (AND DIFFICULTIES)
+--------------------------------------------------------------
+DIFFICULTY
+The Type 1 hypervisor (Proxmox) had no direct internet access:
+the only connection available was a phone's USB tethering,
+which is shared with a PC. On top of that, the iPerf3 test needs
+the Type 2 VM (VirtualBox) and the Type 1 VM (Proxmox) to talk to
+each other. Because they sit on different networks, this required
+NAT, a bridged adapter and a manual route.
+
+NETWORK LAYOUT
+
+  Phone --USB tether--> CachyOS PC --Ethernet (enp2s0)--> Network Switch--> Proxmox
+        (nic1 / vmbr0) --NAT (vmbr2)--> Proxmox VM (10.10.10.10)
+                          |
+                          +--enp2s0 (bridged)--> VirtualBox VM
+                                                 (10.42.0.x)
+
+ADDRESSES USED
+    PC (CachyOS), wired side ......... 10.42.0.1/24
+    Proxmox host (vmbr0) ............. 10.42.0.50/24
+    Proxmox host (vmbr2, internal) ... 10.10.10.1/24
+    Proxmox VM (ens18) ............... 10.10.10.10/24
+    VirtualBox VM .................... 10.42.0.x (DHCP)
+
+--------------------------------------------------------------
+A) HOST PC (CachyOS) - shares the phone's internet
+--------------------------------------------------------------
+- The USB tether connection stays on automatic (ipv4.method auto).
+  The phone provides the internet.
+- The wired connection to Proxmox (enp2s0) is set to "Shared"
+  mode (ipv4.method shared). This gives the PC the address
+  10.42.0.1/24 and makes NetworkManager do NAT and run a DNS
+  forwarder, with DHCP for the machines plugged into that port.
+- Check that the PC firewall is not blocking the traffic.
+
+--------------------------------------------------------------
+B) PROXMOX HOST (Type 1) - bridges and NAT
+--------------------------------------------------------------
+Edit /etc/network/interfaces so that it contains:
+
+  iface nic1 inet manual
+
+  auto vmbr0
+  iface vmbr0 inet static
+      address 10.42.0.50/24
+      gateway 10.42.0.1
+      bridge-ports nic1
+      bridge-stp off
+      bridge-fd 0
+
+  auto vmbr2
+  iface vmbr2 inet static
+      address 10.10.10.1/24
+      bridge-ports none
+      bridge-stp off
+      bridge-fd 0
+      post-up   echo 1 > /proc/sys/net/ipv4/ip_forward
+      post-up   iptables -t nat -A POSTROUTING -s '10.10.10.0/24' -o vmbr0 -j MASQUERADE
+      post-down iptables -t nat -D POSTROUTING -s '10.10.10.0/24' -o vmbr0 -j MASQUERADE
+
+Notes:
+- "nic1" is the NIC the cable is plugged into (it replaced the
+  placeholder "eno1"). Check yours with:  ip a
+- Make sure there is only ONE "gateway" line in the file.
+- vmbr2 is an internal network with no physical port. The
+  MASQUERADE rule lets the Proxmox VM reach the internet through
+  vmbr0.
+
+Apply the changes:
+
+    ifreload -a
+
+DNS: queries to 1.1.1.1 were not getting through the PC, so point
+Proxmox at the PC instead:
+
+    /etc/resolv.conf  ->  nameserver 10.42.0.1
+    (also under System -> DNS in the web UI)
+
+Check that forwarding is on (must print 1):
+
+    cat /proc/sys/net/ipv4/ip_forward
+
+The Proxmox firewall must not block forwarded traffic.
+
+The web UI is reached from the PC at:  https://10.42.0.50:8006
+
+--------------------------------------------------------------
+C) PROXMOX VM (Type 1 guest)
+--------------------------------------------------------------
+- In the VM hardware settings, change the network device from
+  vmbr0 to vmbr2 (uncheck the "Firewall" box).
+- Set a static IP BEFORE adding the route:
+
+    sudo ip addr add 10.10.10.10/24 dev ens18
+    sudo ip route add default via 10.10.10.1
+
+- DNS: use the PC (10.42.0.1) or Proxmox (10.10.10.1) if dnsmasq
+  was set up there.
+- Allow ICMP and port 5201 (TCP and UDP) in the VM firewall.
+
+--------------------------------------------------------------
+D) VIRTUALBOX VM (Type 2 guest)
+--------------------------------------------------------------
+In VirtualBox: Settings -> Network -> Adapter 1
+    Attached to ........... Bridged Adapter
+    Name .................. enp2s0  (the wired port to Proxmox,
+                            NOT the USB tether or the Wi-Fi)
+    Advanced -> Promiscuous Mode: Allow All
+                           (lets the bridged adapter pass traffic
+                            for addresses other than its own)
+
+- The VM gets a 10.42.0.x address from the PC's DHCP, with gateway
+  10.42.0.1. If DHCP fails, set one by hand, for example
+  10.42.0.70/24.
+
+- Add a route to the Proxmox VM's network so that both machines
+  can reach each other:
+
+    Linux:
+        sudo ip route add 10.10.10.0/24 via 10.42.0.50
+
+    Windows (-p makes it persistent):
+        route add 10.10.10.0 mask 255.255.255.0 10.42.0.50 -p
+
+- Allow ICMP and port 5201 (TCP and UDP) in the VM firewall.
+
+--------------------------------------------------------------
+E) CHECK THE CONNECTION BEFORE RUNNING IPERF3
+--------------------------------------------------------------
+From the VirtualBox VM:
+
+    ping 10.10.10.10
+
+From the Proxmox VM:
+
+    ping 10.42.0.1        (the PC)
+    ping 8.8.8.8          (internet)
+    ping <VirtualBox-VM-IP>
+
+When all four work, start the iPerf3 tests from section 3, using
+the IP of the machine running "iperf3 -s" as <SERVER-IP>.
