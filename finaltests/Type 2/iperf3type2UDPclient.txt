@@ -1,0 +1,19 @@
+Connecting to host 10.10.10.10, port 5201
+[  5] local 10.42.0.191 port 40341 connected to 10.10.10.10 port 5201
+[ ID] Interval           Transfer     Bitrate         Total Datagrams
+[  5]   0.00-1.00   sec   129 KBytes  1.05 Mbits/sec  91  
+[  5]   1.00-2.01   sec   129 KBytes  1.05 Mbits/sec  91  
+[  5]   2.01-3.01   sec   126 KBytes  1.03 Mbits/sec  90  
+[  5]   3.01-4.02   sec   116 KBytes   942 Kbits/sec  82  
+[  5]   4.02-5.01   sec   139 KBytes  1.15 Mbits/sec  98  
+[  5]   5.01-6.03   sec  90.5 KBytes   726 Kbits/sec  64  
+[  5]   6.03-7.08   sec   123 KBytes   957 Kbits/sec  87  
+[  5]   7.08-8.05   sec   122 KBytes  1.03 Mbits/sec  86  
+[  5]   8.05-9.01   sec   137 KBytes  1.17 Mbits/sec  96  
+[  5]   9.01-10.00  sec   158 KBytes  1.30 Mbits/sec  112  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Jitter    Lost/Total Datagrams
+[  5]   0.00-10.00  sec  1.24 MBytes  1.04 Mbits/sec  0.000 ms  0/897 (0%)  sender
+[  5]   0.00-10.00  sec  1.24 MBytes  1.04 Mbits/sec  0.027 ms  0/897 (0%)  receiver
+
+iperf Done.

@@ -1,0 +1,1 @@
+type2 - https://browser.geekbench.com/v7/cpu/700581

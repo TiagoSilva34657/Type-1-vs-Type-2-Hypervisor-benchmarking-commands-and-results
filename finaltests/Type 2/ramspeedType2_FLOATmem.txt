@@ -1,0 +1,11 @@
+RAMspeed (Linux) v2.6.0 by Rhett M. Hollander and Paul V. Bolotoff, 2002-09
+
+8Gb per pass mode
+
+FL-POINT  Copy:      15386.58 MB/s
+FL-POINT  Scale:     15416.43 MB/s
+FL-POINT  Add:       17290.67 MB/s
+FL-POINT  Triad:     17043.81 MB/s
+---
+FL-POINT  AVERAGE:   16284.37 MB/s
+
